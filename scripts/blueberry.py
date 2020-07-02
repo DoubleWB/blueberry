@@ -27,7 +27,7 @@ class IKSolver:
     #---How far to move on each step of an interation
     _stepSize = .01
     #---How close to the goal the solution must be to be sufficient
-    _goalAccuracy = .01
+    _goalAccuracy = .05
     #---How many steps for each gradient descent
     _subIterations = 250
     #Current joint angles of the robot
@@ -101,6 +101,7 @@ class IKSolver:
             self._joint_limits[4][0] + random.random()*self._joint_limits[4][1]]
             k = 0
             #Perfrom gradient descent over the next subIteration number of steps
+            numNudges = 0
             while k < self._subIterations:
                 k += 1
                 #Get the difference of the end effector from the goal position
@@ -119,10 +120,14 @@ class IKSolver:
                 dq = self._stepSize * (jacobOutput.pinv() * dx)
                 #Use change in q to approach the best joint configuration
                 newQ = Matrix(q) + dq
+                #Exit solution attempt if too many nudges are occurring relative to the maximum number of gradient descent steps
+                #We don't want to spend too much time on a solution that is boarderline not reachable
+                if numNudges >= self._subIterations/2:
+                    break
                 #Check the new configuration to make sure it is in bounds, and nudge it back in bounds if so
-                #TODO: Exit early if too many nudges are occurring?
                 ind = 0
                 for angle in newQ:
+                    nudged = True
                     if not self._rev_joints[ind]:
                         if angle < self._joint_limits[ind][0]:
                             q[ind] = self._joint_limits[ind][0]
@@ -130,6 +135,7 @@ class IKSolver:
                             q[ind] = self._joint_limits[ind][1]
                         else:
                             q[ind] = angle
+                            nudged = False
                     else:
                         if angle < -1 * self._joint_limits[ind][1]:
                             q[ind] = -1 * self._joint_limits[ind][1]
@@ -137,7 +143,11 @@ class IKSolver:
                             q[ind] = -1 * self._joint_limits[ind][0]
                         else:
                             q[ind] = angle
+                            nudged = False
                     ind += 1
+                if nudged:
+                    numNudges += 1
+                
             #Recalculate the distance to the goal angle post nudging to check if it is the best solution yet
             x = self.getEE(q)
             x = x.col(-1)
@@ -216,6 +226,7 @@ class IKSolver:
         print(self.getEE(bestConfig))
         qNew = self.convertIKQToDegrees(bestConfig)
         self._current = self.setAnglesAndGrip(qNew, self._grip_neutral)
+        
 
 if __name__ == '__main__':
     #Start robot connection and reset robot

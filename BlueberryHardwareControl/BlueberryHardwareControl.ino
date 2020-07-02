@@ -49,7 +49,7 @@ void setup()
   gripperServo.attach(8);
   
   Serial.setTimeout(50);      //ensures the the arduino does not read serial for too long
-  //Serial.println("started");
+  Serial.Print("s");
 } 
 
 //primary arduino loop
